@@ -1,0 +1,39 @@
+name: miscontenedores2
+apiVersion: '2021-10-01'
+properties:
+  containers:
+  - name: web
+    properties:
+      image: miregistropreclasejunio2025.azurecr.io/get-started:part2
+      resources:
+        requests:
+          cpu: 1
+          memoryInGb: 1.5
+      ports:
+      - protocol: tcp
+        port: 80
+  - name: redis
+    properties:
+      image: redis
+      resources:
+        requests:
+          cpu: 1
+          memoryInGb: 1.5
+      ports:
+      - protocol: tcp
+        port: 6379
+  osType: Linux
+  ipAddress:
+    type: Public
+    ports:
+    - protocol: tcp
+      port: 80
+    - protocol: tcp
+      port: 6379
+  imageRegistryCredentials:
+  - server: miregistropreclasejunio2025.azurecr.io
+    username: miregistropreclasejunio2025
+    password: ***
+  - server: index.docker.io
+    username: dgarridouma
+    password: ***

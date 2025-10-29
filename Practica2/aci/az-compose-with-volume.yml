@@ -1,0 +1,46 @@
+name: miscontenedores1305
+apiVersion: '2021-10-01'
+properties:
+  containers:
+  - name: web
+    properties:
+      image: dgarridouma/get-started:part2
+      resources:
+        requests:
+          cpu: 1
+          memoryInGb: 1.5
+      ports:
+      - protocol: tcp
+        port: 80
+  - name: redis
+    properties:
+      image: redis
+      resources:
+        requests:
+          cpu: 1
+          memoryInGb: 1.5
+      volumeMounts:
+        - mountPath: /data
+          name: redisvol
+      ports:
+      - protocol: tcp
+        port: 6379
+  volumes:
+    - name: redisvol
+      azureFile:
+        shareName: redisdata
+        storageAccountName: micuentaaci
+        storageAccountKey: ***
+  osType: Linux
+  ipAddress:
+    type: Public
+    ports:
+    - protocol: tcp
+      port: 80
+    - protocol: tcp
+      port: 6379
+  imageRegistryCredentials:
+  - server: index.docker.io
+    username: dgarridouma
+    password: ***
+
