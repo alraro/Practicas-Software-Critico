@@ -50,6 +50,22 @@ def listar():
         res.append({"error": "Redis connection error"})
     finally:
         return res
+    
+@app.route("/detectar")
+def detectar():
+    res = []
+    data = request.args.get('dato')
+    try:
+        if (data == "") or (data is None):
+            res.append({"error": "Empty input error"})
+        else:
+            temp = float(data)
+            
+    except RedisError:
+        res.append({"error": "Redis connection error"})
+    finally:
+        return res
+
 if __name__ == "__main__":
     PORT = os.getenv('PORT', 80)
     print("PORT: "+str(PORT))
