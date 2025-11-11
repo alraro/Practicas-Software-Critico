@@ -27,33 +27,30 @@ def hello():
 
 @app.route("/nuevo")
 def nuevo():
-    dato = request.args.get('dato')
-    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    res = []
+    data = request.args.get('dato')
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
-        if (dato == "") or (dato is None):
-            respuesta = "Dato no proporcionado, no se agregó nada."
+        if (data == "") or (data is None):
+            res.append({"error": "Empty input error"})
         else:
-            redis.hset("mediciones", fecha, dato)
-            respuesta = "Dato '"+dato+"' agregado a la lista."
+            redis.hset("mediciones", timestamp, data)
+            res.append({"timestamp": timestamp, "data": data, "message": f"New input added."})
     except RedisError:
-        respuesta = "No se pudo conectar a Redis, dato no agregado."
+        res.append({"error": "Redis connection error"})
     finally:
-        return f"<p>{respuesta}</p>"
-
+        return res
 @app.route("/listar")
 def listar():
+    res = []
     try:
         valores = redis.hgetall("mediciones")
-        if not valores:
-            return "<p>No hay datos almacenados.</p>"
-        html = "<h3>Lista de Mediciones:</h3><ul>"
         for fecha, dato in valores.items():
-            html += f"<li>{fecha.decode('utf-8')}: {dato.decode('utf-8')}</li>"
-        html += "</ul>"
-        return html
+            res.append({"date": fecha.decode('utf-8'), "value": dato.decode('utf-8')})
     except RedisError:
-        return "<p>No se pudo conectar a Redis para listar los datos.</p>"
-
+        res.append({"error": "Redis connection error"})
+    finally:
+        return res
 if __name__ == "__main__":
     PORT = os.getenv('PORT', 80)
     print("PORT: "+str(PORT))
