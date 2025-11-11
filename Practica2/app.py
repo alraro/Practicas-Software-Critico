@@ -46,7 +46,7 @@ def listar():
     try:
         valores = redis.hgetall("mediciones")
         for fecha, dato in valores.items():
-            res.append({"date": fecha.decode('utf-8'), "value": dato.decode('utf-8')})
+            res.append({"timestamp": fecha.decode('utf-8'), "value": dato.decode('utf-8')})
     except RedisError:
         res.append({"error": "Redis connection error"})
     finally:
