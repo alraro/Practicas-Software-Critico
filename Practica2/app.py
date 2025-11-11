@@ -29,13 +29,12 @@ def hello():
 def nuevo():
     res = []
     data = request.args.get('dato')
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
         if (data == "") or (data is None):
             res.append({"error": "Empty input error"})
         else:
-            redis.hset("mediciones", timestamp, data)
-            res.append({"timestamp": timestamp, "data": data, "message": f"New input added."})
+            redis.execute_command('TS.ADD', 'temperature', '*', data)
+            res.append({"data": data, "message": f"New input {data} added."})
     except RedisError:
         res.append({"error": "Redis connection error"})
     finally:
@@ -44,9 +43,9 @@ def nuevo():
 def listar():
     res = []
     try:
-        valores = redis.hgetall("mediciones")
-        for fecha, dato in valores.items():
-            res.append({"timestamp": fecha.decode('utf-8'), "value": dato.decode('utf-8')})
+        valores = redis.execute_command('TS.RANGE', 'temperature', '-', '+')
+        for dato in valores:
+            res.append({"timestamp": dato[0], "value": float(dato[1].decode('utf-8'))})
     except RedisError:
         res.append({"error": "Redis connection error"})
     finally:
