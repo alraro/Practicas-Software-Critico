@@ -3,12 +3,17 @@ from redis import Redis, RedisError
 from datetime import datetime
 import os
 import socket
+import tensorflow as tf
 
 
 # Connect to Redis
 REDIS_HOST = os.getenv('REDIS_HOST', "localhost")
 print("REDIS_HOST: "+REDIS_HOST)
 redis = Redis(host=REDIS_HOST, db=0, socket_connect_timeout=2, socket_timeout=2)
+
+model = tf.keras.models.load_model('lstm_autoencoder_model.keras')
+
+model.summary()
 
 app = Flask(__name__)
 
@@ -55,6 +60,7 @@ def listar():
 def detectar():
 	res = []
 	data = request.args.get('dato')
+	threshold = 0.0388
 	window_size = 3
 	try:
 		if (data == "") or (data is None):
@@ -64,7 +70,10 @@ def detectar():
 			if (len(window) < window_size):
 				res.append({"error": "Not enough data for anomaly detection"})
 				return res
-			
+			prediccion = model.predict(data)
+			error = abs(float(data) - prediccion[0][0])
+			if error > threshold:
+				res.append({"mediciones": window, "anomalia": True})
 			redis.execute_command('TS.ADD', 'temperature', '*', data)
 			res.append({"data": data, "message": f"New input {data} added."})
 	except RedisError:
