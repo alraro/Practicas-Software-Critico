@@ -5,7 +5,12 @@ import json
 
 # --- CONFIGURACIÓN ---
 # Cambia esto por la URL de tu API real o tu contenedor Docker
-API_URL = "http://localhost:4000/nuevo" 
+
+host = "localhost"
+port = 80
+endpoint = "detectar"
+
+API_URL = f"http://{host}:{port}/{endpoint}" 
 
 # Probabilidad de anomalía (0.1 = 10% de las veces)
 PROBABILIDAD_ANOMALIA = 0.1 
@@ -52,7 +57,7 @@ def main():
             response = requests.get(API_URL + "?" + f"dato={temperatura}", timeout=2)
             
             # Imprimimos en consola para que veas qué está pasando
-            msg = f"Enviado: {temperatura}°C [{estado}] -> Respuesta: {response.status_code}"
+            msg = f"Enviado: {temperatura}°C [{estado}] -> Respuesta: {response.status_code} {response.text}"
             if estado != "NORMAL":
                 print(f"⚠️  {msg}") # Destacamos la anomalía visualmente
             else:
