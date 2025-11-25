@@ -18,6 +18,22 @@ model.summary()
 
 app = Flask(__name__)
 
+def insert_ts_data(data, key='temperature', timestamp='*'):
+	try:
+		redis.execute_command('TS.ADD', key, timestamp, data)
+	except RedisError as e:
+		print(f"Error inserting data into RedisTimeSeries: {e}")
+
+def get_ts_data(key='temperature', from_time='-', to_time='+', count=-1):
+	try:
+		if count != -1:
+			return redis.execute_command('TS.RANGE', key, from_time, to_time, 'COUNT', count)
+		else:
+			return redis.execute_command('TS.RANGE', key, from_time, to_time)
+	except RedisError as e:
+		print(f"Error retrieving data from RedisTimeSeries: {e}")
+		return []
+
 @app.route("/")
 def hello():
 	try:
@@ -39,7 +55,7 @@ def nuevo():
 		if (data == "") or (data is None):
 			res.append({"error": "Empty input error"})
 		else:
-			redis.execute_command('TS.ADD', 'temperature', '*', data)
+			insert_ts_data(float(data))
 			res.append({"data": data, "message": f"New input {data} added."})
 	except RedisError as e:
 		res.append({"error": str(e)})
@@ -49,7 +65,7 @@ def nuevo():
 def listar():
 	res = []
 	try:
-		valores = redis.execute_command('TS.RANGE', 'temperature', '-', '+')
+		valores = get_ts_data()
 		for dato in valores:
 			res.append({"timestamp": dato[0], "value": float(dato[1].decode('utf-8'))})
 	except RedisError as e:
@@ -67,30 +83,24 @@ def detectar():
 		if (data == "") or (data is None):
 			res.append({"error": "Empty input error"})
 		else:
-			# Obtener las últimas `window_size` mediciones (REVRANGE con COUNT)
-			window = redis.execute_command('TS.REVRANGE', 'temperature', '-', '+', 'COUNT', window_size)
-			print("Raw Window:", window)
+			window = get_ts_data(count=window_size)
 			window_values = np.array(list((map(lambda x: float(x[1].decode('utf-8')), reversed(window)))))
-			print("Window Values:", window_values)
-			print("Window:", window, "| Len ", len(window))
+			data_val = float(data)
 			if (len(window) < window_size):
 				res.append({"error": "Not enough data for anomaly detection"})
-				redis.execute_command('TS.ADD', 'temperature', '*', float(data))
-				return res
-			# Convertir entrada a float y preparar para la predicción
-			data_val = float(data)
-			prediccion = model.predict(window_values.reshape(1, window_size, 1))
-			error = abs(data_val - float(prediccion[0][0]))
-			if error > threshold:
-				res.append({"mediciones": window, "anomalia": True})
 			else:
-				res.append({"mediciones": window, "anomalia": False})
-			redis.execute_command('TS.ADD', 'temperature', '*', data_val)
-			res.append({"data": data_val, "message": f"New input {data_val} added."})
+				prediccion = model.predict(window_values.reshape(1, 12, 1))
+				error = abs(data_val - float(prediccion[0][0].item()))
+				mediciones_serializables = [{"timestamp": int(dato[0]), "value": float(dato[1].decode('utf-8'))} for dato in window]
+				if error > threshold:
+					res.append({"mediciones": mediciones_serializables, "anomalia": True})
+				else:
+					res.append({"mediciones": mediciones_serializables, "anomalia": False})
+				res.append({"data": data_val, "message": f"New input {data_val} added."})
+			insert_ts_data(data_val)
 	except RedisError as e:
 		res.append({"Redis error": str(e)})
 	except Exception as e:
-		# Capturamos otros errores (shape del modelo, conversión, etc.) y los devolvemos
 		res.append({"error": str(e)})
 	finally:
 		return res
