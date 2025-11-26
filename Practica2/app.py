@@ -72,13 +72,23 @@ def listar():
 		res.append({"error": str(e)})
 	finally:
 		return res
-	
+
+def is_float(value):
+	try:
+		float(value)
+		return True
+	except ValueError:
+		return False
+
 @app.route("/detectar")
 def detectar():
 	res = []
 	data = request.args.get('dato')
 	threshold = 0.0388
 	window_size = 12
+	if not is_float(data):
+		res.append({"error": "Invalid input error"})
+		return res
 	try:
 		if (data == "") or (data is None):
 			res.append({"error": "Empty input error"})
