@@ -1,6 +1,7 @@
 from flask import Flask, request
 from redis import Redis, RedisError
 from datetime import datetime
+import time
 import os
 import socket
 import tensorflow as tf
@@ -158,7 +159,6 @@ def detectar():
             for dato in reversed(past_window)
         ]
         
-        import time
         mediciones_serializables.append({"time": int(time.time()*1000), "valor": data_val})
 
         # Detección de Anomalía (si/no)

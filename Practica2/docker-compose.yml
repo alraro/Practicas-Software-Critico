@@ -1,9 +1,9 @@
 version: "3"
 services:
   web:
-    image: alraro/practica2-software-critico:1.1.5
+    image: alraro/practica2-software-critico:1.1.6
     deploy:
-      replicas: 10
+      replicas: 5
       restart_policy:
         condition: on-failure
     ports:
