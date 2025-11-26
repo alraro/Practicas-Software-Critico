@@ -24,15 +24,6 @@ services:
         constraints: [ node.role == manager ]
     networks:
       - webnet
-  redis:
-    image: redis
-    ports:
-      - "6379:6379"
-    deploy:
-      placement:
-        constraints: [ node.role == manager ]
-    networks:
-      - webnet
 
   grafana:
     image: grafana/grafana
@@ -47,6 +38,15 @@ services:
     environment:
       - GF_INSTALL_PLUGINS=redis-datasource
 
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"
+    deploy:
+      placement:
+        constraints: [ node.role == manager ]
+    networks:
+      - webnet
 volumes:
   grafana_data:
 
