@@ -7,13 +7,13 @@ import json
 # Cambia esto por la URL de tu API real o tu contenedor Docker
 
 host = "localhost"
-port = 5000
+port = 4000
 endpoint = "detectar"
 
 API_URL = f"http://{host}:{port}/{endpoint}" 
 
 # Probabilidad de anomalía (0.1 = 10% de las veces)
-PROBABILIDAD_ANOMALIA = 0.1 
+PROBABILIDAD_ANOMALIA = 0.15 
 
 def generar_temperatura():
     """
@@ -57,19 +57,20 @@ def main():
             response = requests.get(API_URL + "?" + f"dato={temperatura}", timeout=2)
             
             # Imprimimos en consola para que veas qué está pasando
-            msg = f"Enviado: {temperatura}°C [{estado}] -> Respuesta: {response.status_code} {response.text}"
+            texto_resp = response.json()
+            deteccion = texto_resp[0]['anomalia']
+            
+            msg = f"Enviado: {temperatura}°F [{estado}] -> Respuesta: {response.status_code} Deteccion: {deteccion}"
             if estado != "NORMAL":
-                print(f"⚠️  {msg}") # Destacamos la anomalía visualmente
+                print(f"⚠️  {msg}", 'Anomalia:', '✅' if deteccion == 'si' else '❌') # Destacamos la anomalía visualmente
             else:
-                print(f"✅ {msg}")
-
+                print(f"✅ {msg}", 'Anomalia:', '✅' if deteccion == 'no' else '❌')
         except requests.exceptions.ConnectionError:
             print(f"❌ Error: No se pudo conectar a {API_URL}. ¿Está levantado el Docker?")
         except Exception as e:
             print(f"❌ Error inesperado: {e}")
 
         # Esperar 1 segundo
-        time.sleep(1)
 
 if __name__ == "__main__":
     main()

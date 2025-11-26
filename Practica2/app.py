@@ -105,7 +105,7 @@ def detectar():
             res.append({"error": "Empty input error"})
             return res # Retornar inmediatamente
 
-        # 1. Obtenemos los 11 datos anteriores para completar la ventana con el actual
+        # Obtenemos los 11 datos anteriores para completar la ventana con el actual
         # get_ts_data con REVRANGE nos dará: [Dato(t-1), Dato(t-2), ..., Dato(t-11)]
         past_window = get_ts_data(count=window_size - 1)
         
@@ -117,7 +117,7 @@ def detectar():
             res.append({"error": "Not enough data history to fill window", "data": data_val})
             return res
 
-        # 2. Preparamos el array de valores
+        # Preparamos el array de valores
         # Como get_ts_data(REVRANGE) devuelve [Nuevo -> Viejo],
         # reversed(past_window) lo convierte en [Viejo -> Nuevo] (Cronológico: t-11 ... t-1)
         past_values = [float(x[1].decode('utf-8')) for x in reversed(past_window)]
@@ -126,17 +126,17 @@ def detectar():
         # Creamos la ventana completa de 12 elementos: [t-11, ..., t-1, t_actual]
         full_window = np.array(past_values + [data_val])
         
-        # 3. Preprocesamiento (Escalado) igual que en el entrenamiento
+        # Preprocesamiento (Escalado) igual que en el entrenamiento
         # Reshape a (-1, 1) porque el scaler espera columna
         window_scaled = scaler.transform(full_window.reshape(-1, 1))
         
         # Reshape para el modelo LSTM: (1 muestra, 12 pasos, 1 característica)
         X_input = window_scaled.reshape(1, window_size, 1)
 
-        # 4. Predicción (Reconstrucción)
+        # Predicción (Reconstrucción)
         X_pred = model.predict(X_input, verbose=0) # verbose=0 para limpiar logs
 
-        # 5. Cálculo del Error (MAE)
+        # Cálculo del Error (MAE)
         # El modelo devuelve la reconstrucción de la ventana.
         # Calculamos el error promedio de reconstrucción de esta ventana.
         mae_loss = np.mean(np.abs(X_pred - X_input))
@@ -151,7 +151,7 @@ def detectar():
         val_reconstruido = float(scaler.inverse_transform([[val_reconstruido_scaled]])[0][0])
 
 
-        # 6. Preparar respuesta con el formato solicitado
+        # Preparar respuesta con el formato solicitado
         # Formato de mediciones: "time" y "valor"
         mediciones_serializables = [
             {"time": int(dato[0]), "valor": float(dato[1].decode('utf-8'))} 
@@ -167,10 +167,9 @@ def detectar():
         res.append({
             "mediciones": mediciones_serializables, 
             "anomalia": "si" if es_anomalia else "no",
-            "valor_esperado": val_reconstruido # Útil para depurar o mostrar en frontend
         })
 
-        # 7. Insertar en Redis (Lógica de Sanitación)
+        # Insertar en Redis (Lógica de Sanitación)
         if es_anomalia:
             # Si es anomalía, NO guardamos el dato real corrupto.
             # Guardamos el valor reconstruido (suavizado) para mantener la ventana limpia.

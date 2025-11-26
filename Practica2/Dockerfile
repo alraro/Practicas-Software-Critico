@@ -12,6 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ./app.py /app
 COPY ./lstm_autoencoder_model.keras /app
+COPY ./scaler.pkl /app
 
 # Make port 80 available to the world outside this container
 EXPOSE 80
