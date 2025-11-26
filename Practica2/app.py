@@ -136,16 +136,21 @@ def detectar():
 
         print(f"DEBUG: Real: {data_val}, MAE Loss: {mae_loss:.5f}, Threshold: {threshold}")
 
+        # --- Lógica de recuperación del valor esperado ---
+        # Obtenemos el valor que el modelo "reconstruyó" para el último paso (el actual)
+        # X_pred tiene forma (1, 12, 1), el último es el índice -1
+        val_reconstruido_scaled = X_pred[0, -1, 0]
+        # Deshacemos el escalado para tener el valor real "sano"
+        val_reconstruido = float(scaler.inverse_transform([[val_reconstruido_scaled]])[0][0])
+
+
         # 6. Preparar respuesta con el formato solicitado
         # Formato de mediciones: "time" y "valor"
-        # Usamos past_window directamente para la respuesta o lo invertimos según preferencia visual
-        # Aquí mostramos cronológicamente (reversed) + el dato actual
         mediciones_serializables = [
             {"time": int(dato[0]), "valor": float(dato[1].decode('utf-8'))} 
             for dato in reversed(past_window)
         ]
         
-        # Añadir el dato actual a la lista visual
         import time
         mediciones_serializables.append({"time": int(time.time()*1000), "valor": data_val})
 
@@ -154,11 +159,19 @@ def detectar():
         
         res.append({
             "mediciones": mediciones_serializables, 
-            "anomalia": "si" if es_anomalia else "no"
+            "anomalia": "si" if es_anomalia else "no",
+            "valor_esperado": val_reconstruido # Útil para depurar o mostrar en frontend
         })
 
-        # 7. Insertar en Redis finalmente
-        insert_ts_data(data_val)
+        # 7. Insertar en Redis (Lógica de Sanitación)
+        if es_anomalia:
+            # Si es anomalía, NO guardamos el dato real corrupto.
+            # Guardamos el valor reconstruido (suavizado) para mantener la ventana limpia.
+            print(f"ANOMALIA: Guardando valor sanitizado {val_reconstruido:.4f} en lugar de {data_val}")
+            insert_ts_data(val_reconstruido)
+        else:
+            # Si es normal, guardamos el dato real.
+            insert_ts_data(data_val)
 
     except RedisError as e:
         res.append({"Redis error": str(e)})

@@ -7,7 +7,7 @@ import json
 # Cambia esto por la URL de tu API real o tu contenedor Docker
 
 host = "localhost"
-port = 80
+port = 5000
 endpoint = "detectar"
 
 API_URL = f"http://{host}:{port}/{endpoint}" 
@@ -25,7 +25,7 @@ def generar_temperatura():
         # --- CASO ANOMALÍA ---
         # Generamos un pico de calor o frío extremo
         if random.choice([True, False]):
-            temp = random.uniform(80.0, 120.0)  # Fuego/Sobrecalentamiento
+            temp = random.uniform(125.0, 150.0)  # Fuego/Sobrecalentamiento
             tipo = "ANOMALIA_ALTA"
         else:
             temp = random.uniform(-20.0, 0.0)   # Fallo de sensor/Congelación
@@ -33,7 +33,7 @@ def generar_temperatura():
     else:
         # --- CASO NORMAL ---
         # Temperatura ambiente estable con ligera variación
-        temp = random.uniform(20.0, 25.0)
+        temp = random.uniform(65.0, 71.0)
         tipo = "NORMAL"
     
     return round(temp, 2), tipo
