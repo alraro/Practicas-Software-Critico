@@ -1,14 +1,13 @@
 version: "3"
 services:
   web:
-    # replace username/repo:tag with your name and image details
-    image: alraro/practica2-software-critico:1.1.3
+    image: alraro/practica2-software-critico:1.1.4
     deploy:
       replicas: 1
       restart_policy:
         condition: on-failure
     ports:
-      - "4000:80"
+      - "4000:5000"
     environment:
       - REDIS_HOST=redis
     networks:
@@ -21,7 +20,7 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock"
     deploy:
       placement:
-        constraints: [ node.role == manager ]
+        constraints: [node.role == manager]
     networks:
       - webnet
   redis:
@@ -30,7 +29,7 @@ services:
       - "6379:6379"
     deploy:
       placement:
-        constraints: [ node.role == manager ]
+        constraints: [node.role == manager]
     networks:
       - webnet
 
@@ -49,7 +48,6 @@ services:
 
 volumes:
   grafana_data:
-
 
 networks:
   webnet:

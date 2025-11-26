@@ -2,3 +2,5 @@ Flask
 Redis
 requests
 tensorflow-cpu
+joblib
+scikit-learn
