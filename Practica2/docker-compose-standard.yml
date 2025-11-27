@@ -1,7 +1,6 @@
-version: "3"
 services:
   web:
-    image: alraro/practica2-software-critico:1.1.6
+    image: alraro/practica2-software-critico:latest
     deploy:
       replicas: 5
       restart_policy:
@@ -21,7 +20,7 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock"
     deploy:
       placement:
-        constraints: [ node.role == manager ]
+        constraints: [node.role == manager]
     networks:
       - webnet
   redis:
@@ -30,7 +29,7 @@ services:
       - "6379:6379"
     deploy:
       placement:
-        constraints: [ node.role == manager ]
+        constraints: [node.role == manager]
     networks:
       - webnet
 
@@ -49,7 +48,6 @@ services:
 
 volumes:
   grafana_data:
-
 
 networks:
   webnet:

@@ -1,38 +1,49 @@
-version: "3"
+# Configuración común para no repetir 6 veces lo mismo
+x-redis-cluster-node: &redis-cluster-node
+  image: redis/redis-stack-server:latest # Importante: Imagen con TimeSeries
+  networks:
+    redis_cluster_net:
+  # Comando vital: Habilitar cluster, timeouts, y CARGAR EL MÓDULO TimeSeries
+  command: >
+    redis-server 
+    --port 6379 
+    --cluster-enabled yes 
+    --cluster-config-file nodes.conf 
+    --cluster-node-timeout 5000 
+    --appendonly yes 
+    --loadmodule /opt/redis-stack/lib/redistimeseries.so
+    --protected-mode no
+  healthcheck:
+    test: ["CMD", "redis-cli", "ping"]
+    interval: 5s
+    timeout: 3s
+    retries: 5
+
 services:
   web:
-    image: alraro/practica2-software-critico:1.1.6
-    deploy:
-      replicas: 5
-      restart_policy:
-        condition: on-failure
+    image: alraro/practica2-software-critico:latest
     ports:
       - "4000:5000"
     environment:
-      - REDIS_HOST=redis
       - PORT=5000
+      # Configuración para tu código Python (Parte 3)
+      - REDIS_MODE=cluster
+      # Le damos una lista de nodos semilla para empezar [cite: 104]
+      - REDIS_CLUSTER_NODES=redis-node-1:6379,redis-node-2:6379,redis-node-3:6379
     networks:
-      - webnet
+      - redis_cluster_net
+    depends_on:
+      redis-cluster-init:
+        condition: service_completed_successfully
+
   visualizer:
     image: dockersamples/visualizer:stable
     ports:
       - "8080:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
-    deploy:
-      placement:
-        constraints: [ node.role == manager ]
     networks:
-      - webnet
-  redis:
-    image: redis
-    ports:
-      - "6379:6379"
-    deploy:
-      placement:
-        constraints: [ node.role == manager ]
-    networks:
-      - webnet
+      - redis_cluster_net
 
   grafana:
     image: grafana/grafana
@@ -40,16 +51,82 @@ services:
       - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-    depends_on:
-      - redis
     networks:
-      - webnet
+      - redis_cluster_net
     environment:
       - GF_INSTALL_PLUGINS=redis-datasource
+
+  # --- NODOS DEL CLUSTER (3 Maestros + 3 Réplicas) ---
+  # Asignamos IPs fijas para facilitar la creación del cluster
+  redis-node-1:
+    <<: *redis-cluster-node
+    container_name: redis-node-1
+    networks:
+      redis_cluster_net:
+        ipv4_address: 172.28.0.11
+
+  redis-node-2:
+    <<: *redis-cluster-node
+    container_name: redis-node-2
+    networks:
+      redis_cluster_net:
+        ipv4_address: 172.28.0.12
+
+  redis-node-3:
+    <<: *redis-cluster-node
+    container_name: redis-node-3
+    networks:
+      redis_cluster_net:
+        ipv4_address: 172.28.0.13
+
+  redis-node-4:
+    <<: *redis-cluster-node
+    container_name: redis-node-4
+    networks:
+      redis_cluster_net:
+        ipv4_address: 172.28.0.14
+
+  redis-node-5:
+    <<: *redis-cluster-node
+    container_name: redis-node-5
+    networks:
+      redis_cluster_net:
+        ipv4_address: 172.28.0.15
+
+  redis-node-6:
+    <<: *redis-cluster-node
+    container_name: redis-node-6
+    networks:
+      redis_cluster_net:
+        ipv4_address: 172.28.0.16
+
+  # --- INICIALIZADOR DEL CLUSTER ---
+  # Este contenedor efímero ejecuta el comando para unir los 6 nodos [cite: 150]
+  redis-cluster-init:
+    image: redis/redis-stack-server:latest
+    container_name: redis-cluster-init
+    networks:
+      redis_cluster_net:
+    depends_on:
+      redis-node-1: { condition: service_healthy }
+      redis-node-2: { condition: service_healthy }
+      redis-node-3: { condition: service_healthy }
+      redis-node-4: { condition: service_healthy }
+      redis-node-5: { condition: service_healthy }
+      redis-node-6: { condition: service_healthy }
+    # El comando mágico que crea el cluster con 1 réplica por maestro
+    command: >
+      redis-cli --cluster create 
+      172.28.0.11:6379 172.28.0.12:6379 172.28.0.13:6379 
+      172.28.0.14:6379 172.28.0.15:6379 172.28.0.16:6379 
+      --cluster-replicas 1 --cluster-yes
 
 volumes:
   grafana_data:
 
-
 networks:
-  webnet:
+  redis_cluster_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24

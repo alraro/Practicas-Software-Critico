@@ -19,7 +19,7 @@ x-redis-sentinel-config: &redis-sentinel-config
 
 services:
   web:
-    image: alraro/practica2-software-critico:1.1.7
+    image: alraro/practica2-software-critico:latest
     deploy:
       replicas: 1
       restart_policy:

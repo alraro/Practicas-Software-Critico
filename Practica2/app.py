@@ -1,5 +1,6 @@
 from flask import Flask, request
 from redis import Redis, RedisError, Sentinel
+from redis.cluster import RedisCluster, ClusterNode
 from datetime import datetime
 import time
 import os
@@ -23,8 +24,22 @@ def get_redis_sentinel_client():
     return sentinel.master_for('mymaster', socket_timeout=2)
 
 def get_redis_cluster_client():
-    print("Not implemented: Redis Cluster mode")
-    exit(1)
+    startup_nodes_str = os.getenv('REDIS_CLUSTER_NODES', "localhost:6379")
+    startup_nodes = []
+    for node in startup_nodes_str.split(','):
+        host, port = node.split(':')
+        startup_nodes.append(ClusterNode(host=host, port=int(port)))
+        print(f"Cluster node created: Host={host}, Port={port}")
+    
+    print("Connecting to Redis in Cluster mode with nodes: ", startup_nodes)
+    redis = RedisCluster(
+        startup_nodes=startup_nodes,
+        decode_responses=False,
+        socket_connect_timeout=2,
+        socket_timeout=2,
+        skip_full_coverage_check=True
+    )
+    return redis
 
 def get_redis_client(mode):
     if (mode == 'standalone'):
