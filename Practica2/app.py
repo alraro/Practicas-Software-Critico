@@ -1,5 +1,5 @@
 from flask import Flask, request
-from redis import Redis, RedisError
+from redis import Redis, RedisError, Sentinel
 from datetime import datetime
 import time
 import os
@@ -9,17 +9,30 @@ import numpy as np
 from joblib import load
 import sklearn as skl
 
+def get_redis_standalone_client():
+    REDIS_HOST = os.getenv('REDIS_HOST', "localhost")
+    print("Connecting to Redis in standalone mode at host: "+REDIS_HOST)
+    return Redis(host=REDIS_HOST, db=0, socket_connect_timeout=2, socket_timeout=2)
+
+def get_redis_sentinel_client():
+    print("Connecting to Redis in Sentinel mode")
+    sentinel_hosts = os.getenv('REDIS_SENTINEL_HOSTS', "localhost:26379").split(',')
+    sentinel = Sentinel([(host.split(':')[0], int(host.split(':')[1])) for host in sentinel_hosts], socket_timeout=0.1)
+    print("Sentinel hosts: ", sentinel_hosts)
+    print("Master info: ", sentinel.discover_master('mymaster'))
+    return sentinel.master_for('mymaster', socket_timeout=2)
+
+def get_redis_cluster_client():
+    print("Not implemented: Redis Cluster mode")
+    exit(1)
+
 def get_redis_client(mode):
     if (mode == 'standalone'):
-        REDIS_HOST = os.getenv('REDIS_HOST', "localhost")
-        print("Connecting to Redis in standalone mode at host: "+REDIS_HOST)
-        return Redis(host=REDIS_HOST, db=0, socket_connect_timeout=2, socket_timeout=2)
-    elif (mode == 'setinel'):
-        print("Not implemented: Redis Sentinel mode")
-        exit(1)
+        return get_redis_standalone_client()
+    elif (mode == 'sentinel'):
+        return get_redis_sentinel_client()
     elif (mode == 'cluster'):
-        print("Not implemented: Redis Cluster mode")
-        exit(1)
+        return get_redis_cluster_client()
     else:
         print(f"Unknown REDIS_MODE: {mode}")
         exit(1)
@@ -49,12 +62,8 @@ def get_ts_data(key='temperature', count=-1):
     """
     try:
         if count != -1:
-            # TS.REVRANGE key fromTimestamp toTimestamp COUNT count
-            # '+' es el tiempo máximo (ahora), '-' es el mínimo.
-            # Esto devuelve los N datos más recientes.
             return redis.execute_command('TS.REVRANGE', key, '-', '+', 'COUNT', count)
         else:
-            # Si no hay límite, devolvemos todo el rango usando TS.RANGE estándar
             return redis.execute_command('TS.RANGE', key, '-', '+')
     except RedisError as e:
         print(f"Error retrieving data from RedisTimeSeries: {e}")
@@ -87,6 +96,7 @@ def nuevo():
 		res.append({"error": str(e)})
 	finally:
 		return res
+
 @app.route("/listar")
 def listar():
 	res = []
