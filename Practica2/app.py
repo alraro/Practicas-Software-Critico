@@ -9,10 +9,23 @@ import numpy as np
 from joblib import load
 import sklearn as skl
 
-# Connect to Redis
-REDIS_HOST = os.getenv('REDIS_HOST', "localhost")
-print("REDIS_HOST: "+REDIS_HOST)
-redis = Redis(host=REDIS_HOST, db=0, socket_connect_timeout=2, socket_timeout=2)
+def get_redis_client(mode):
+    if (mode == 'standalone'):
+        REDIS_HOST = os.getenv('REDIS_HOST', "localhost")
+        print("Connecting to Redis in standalone mode at host: "+REDIS_HOST)
+        return Redis(host=REDIS_HOST, db=0, socket_connect_timeout=2, socket_timeout=2)
+    elif (mode == 'setinel'):
+        print("Not implemented: Redis Sentinel mode")
+        exit(1)
+    elif (mode == 'cluster'):
+        print("Not implemented: Redis Cluster mode")
+        exit(1)
+    else:
+        print(f"Unknown REDIS_MODE: {mode}")
+        exit(1)
+
+redis_mode = os.getenv('REDIS_MODE', "standalone")
+redis = get_redis_client(redis_mode)
 
 model = tf.keras.models.load_model('lstm_autoencoder_model.keras')
 

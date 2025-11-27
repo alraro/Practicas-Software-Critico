@@ -1,4 +1,19 @@
 version: "3"
+
+x-sentinel-config: &sentinel-base
+  image: redis:6.2
+  entrypoint: /bin/bash
+  command: >
+    -c "echo 'sentinel monitor mymaster redis-master 6379 2' > /etc/redis/sentinel.conf &&
+        echo 'sentinel resolve-hostnames yes' >> /etc/redis/sentinel.conf &&
+        echo 'sentinel down-after-milliseconds mymaster 5000' >> /etc/redis/sentinel.conf &&
+        echo 'sentinel failover-timeout mymaster 60000' >> /etc/redis/sentinel.conf &&
+        redis-server /etc/redis/sentinel.conf --sentinel"
+  networks:
+    - webnet
+  depends_on:
+    - redis-master
+
 services:
   web:
     image: alraro/practica2-software-critico:1.1.6
@@ -13,6 +28,11 @@ services:
       - PORT=5000
     networks:
       - webnet
+    depends_on:
+      - sentinel-1
+      - sentinel-2
+      - sentinel-3
+
   visualizer:
     image: dockersamples/visualizer:stable
     ports:
@@ -38,15 +58,35 @@ services:
     environment:
       - GF_INSTALL_PLUGINS=redis-datasource
 
-  redis:
-    image: redis
+  redis-master:
+    image: redis:6.2
+    container_name: redis-master
     ports:
       - "6379:6379"
-    deploy:
-      placement:
-        constraints: [ node.role == manager ]
     networks:
       - webnet
+  
+  sentinel-1:
+    <<: *sentinel-config
+    container_name: redis-sentinel-1
+    ports:
+      - "26379:26379"
+    volumes:
+      - ./redis_sentinel/master/redis.conf:/usr/local/etc/redis/redis.conf
+
+  sentinel-2:
+    <<: *sentinel-config
+    container_name: redis-sentinel-2
+    ports:
+      - "26380:26379"
+
+  sentinel-3:
+    <<: *sentinel-config
+    container_name: redis-sentinel-3
+    ports:
+      - "26381:26379"
+  
+
 volumes:
   grafana_data:
 
