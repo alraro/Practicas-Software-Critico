@@ -79,6 +79,13 @@ def get_ts_data(key='temperature', count=-1):
 		print(f"Error retrieving data from RedisTimeSeries: {e}")
 		return []
 
+def is_float(value):
+	try:
+		float(value)
+		return True
+	except ValueError:
+		return False
+
 @app.route("/")
 def hello():
 	try:
@@ -94,16 +101,17 @@ def hello():
 
 @app.route("/nuevo")
 def nuevo():
+	hostname = socket.gethostname()
 	res = []
 	data = request.args.get('dato')
 	try:
-		if (data == "") or (data is None):
-			res.append({"error": "Empty input error"})
+		if (data == "") or (data is None) or (not is_float(data)):
+			res.append({"hostname": hostname, "error": "Empty or invalid input error"})
 		else:
 			insert_ts_data(float(data))
 			res.append({"data": data, "message": f"New input {data} added."})
 	except RedisError as e:
-		res.append({"error": str(e)})
+		res.append({"hostname": hostname, "error": str(e)})
 	finally:
 		return res
 
@@ -111,24 +119,18 @@ def nuevo():
 def listar():
 	res = {}
 	data_list = []
+	hostname = socket.gethostname()
 	try:
 		valores = get_ts_data()
 		for dato in valores:
 			data_list.append({"timestamp": dato[0], "value": float(dato[1].decode('utf-8'))})
    
-		res['hostname'] = socket.gethostname()
+		res['hostname'] = hostname
 		res['data'] = data_list
 	except RedisError as e:
-		res.append({"error": str(e)})
+		res.append({"hostname": hostname, "error": str(e)})
 	finally:
 		return res
-
-def is_float(value):
-	try:
-		float(value)
-		return True
-	except ValueError:
-		return False
 
 @app.route("/detectar")
 def detectar():
@@ -137,10 +139,11 @@ def detectar():
 	# Usar el mismo umbral que guardaste en umbral_mae.txt
 	threshold = 0.0388 
 	window_size = 12
+	hostname = socket.gethostname()
 	
 	try:
 		if (data == "") or (data is None):
-			res.append({"error": "Empty input error"})
+			res.append({"hostname": hostname, "error": "Empty input error"})
 			return res # Retornar inmediatamente
 
 		# Obtenemos los 11 datos anteriores para completar la ventana con el actual
@@ -152,7 +155,7 @@ def detectar():
 			 # Si no hay suficientes datos, solo guardamos el dato sin predecir
 			data_val = float(data)
 			insert_ts_data(data_val)
-			res.append({"error": "Not enough data history to fill window", "data": data_val})
+			res.append({"hostname": hostname, "error": "Not enough data history to fill window", "data": data_val})
 			return res
 
 		# Preparamos el array de valores
@@ -204,6 +207,7 @@ def detectar():
 		res.append({
 			"mediciones": mediciones_serializables, 
 			"anomalia": "si" if es_anomalia else "no",
+			"hostname": hostname
 		})
 
 		# Insertar en Redis (Lógica de Sanitación)
@@ -217,12 +221,12 @@ def detectar():
 			insert_ts_data(data_val)
 
 	except RedisError as e:
-		res.append({"Redis error": str(e)})
+		res.append({"hostname": hostname, "Redis error": str(e)})
 	except Exception as e:
 		# Es bueno imprimir el stacktrace en consola para depurar
 		import traceback
 		traceback.print_exc()
-		res.append({"error": str(e)})
+		res.append({"hostname": hostname, "error": str(e)})
 	
 	return res
 
