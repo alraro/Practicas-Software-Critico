@@ -1,0 +1,153 @@
+x-redis-replica-config: &redis-replica-config
+  image: redis/redis-stack-server:latest
+  command: >
+    sh -c "echo 'Esperando a que el Master arranque...' &&
+      sleep 10 &&
+      redis-server --slaveof redis-master 6379 --loadmodule /opt/redis-stack/lib/redistimeseries.so --protected-mode no"
+  depends_on:
+    - redis-master
+  networks:
+    - webnet
+
+x-redis-sentinel-config: &redis-sentinel-config
+  image: redis:6.2
+  command: ["redis-sentinel", "/usr/local/etc/redis/sentinel.conf"]
+  depends_on:
+    - redis-master
+  networks:
+    - webnet
+
+services:
+  web:
+    image: alraro/practica2-software-critico:latest
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+    ports:
+      - "4000:5000"
+    environment:
+      - REDIS_HOST=redis
+      - PORT=5000
+      - REDIS_MODE=sentinel
+      - REDIS_SENTINEL_HOSTS=sentinel-1:26379,sentinel-2:26379,sentinel-3:26379
+    networks:
+      - webnet
+    depends_on:
+      - sentinel-1
+      - sentinel-2
+      - sentinel-3
+
+  visualizer:
+    image: dockersamples/visualizer:stable
+    ports:
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    networks:
+      - webnet
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - redis-master
+    networks:
+      - webnet
+    environment:
+      - GF_INSTALL_PLUGINS=redis-datasource
+
+  redis-master:
+    image: redis/redis-stack-server:latest
+    container_name: redis-master
+    ports:
+      - "6379:6379"
+    command: >
+      sh -c "echo 'Esperando a redis-master...' && sleep 10 &&
+      echo 'bind 0.0.0.0' > /tmp/redis.conf &&
+      echo 'protected-mode no' >> /tmp/redis.conf &&
+      echo 'port 6379' >> /tmp/redis.conf &&
+      echo 'appendonly yes' >> /tmp/redis.conf &&
+      redis-server /tmp/redis.conf --loadmodule /opt/redis-stack/lib/redistimeseries.so"
+    networks:
+      - webnet
+    restart: always
+
+  redis-replica-1:
+    <<: *redis-replica-config
+    container_name: redis-replica-1
+    restart: on-failure
+
+  redis-replica-2:
+    <<: *redis-replica-config
+    container_name: redis-replica-2
+    restart: on-failure
+
+  sentinel-1:
+    <<: *redis-sentinel-config
+    container_name: redis-sentinel-1
+    ports:
+      - "26379:26379"
+    volumes:
+      - ./redis_sentinel/sentinels:/usr/local/etc/redis/config-dir
+    command: >
+      sh -c "echo 'Esperando a redis-master...' && sleep 10 &&
+      echo 'bind 0.0.0.0' > /tmp/sentinel.conf &&
+      echo 'protected-mode no' >> /tmp/sentinel.conf &&
+      echo 'port 26379' >> /tmp/sentinel.conf &&
+      echo 'sentinel monitor mymaster redis-master 6379 2' >> /tmp/sentinel.conf &&
+      echo 'sentinel down-after-milliseconds mymaster 5000' >> /tmp/sentinel.conf &&
+      echo 'sentinel failover-timeout mymaster 10000' >> /tmp/sentinel.conf &&
+      echo 'sentinel parallel-syncs mymaster 1' >> /tmp/sentinel.conf &&
+      echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
+      redis-sentinel /tmp/sentinel.conf"
+
+  sentinel-2:
+    <<: *redis-sentinel-config
+    container_name: redis-sentinel-2
+    ports:
+      - "26380:26379"
+    volumes:
+      - ./redis_sentinel/sentinels:/usr/local/etc/redis/config-dir
+    command: >
+      sh -c "echo 'Esperando a redis-master...' && sleep 10 &&
+      echo 'bind 0.0.0.0' > /tmp/sentinel.conf &&
+      echo 'protected-mode no' >> /tmp/sentinel.conf &&
+      echo 'port 26380' >> /tmp/sentinel.conf &&
+      echo 'sentinel monitor mymaster redis-master 6379 2' >> /tmp/sentinel.conf &&
+      echo 'sentinel down-after-milliseconds mymaster 5000' >> /tmp/sentinel.conf &&
+      echo 'sentinel failover-timeout mymaster 10000' >> /tmp/sentinel.conf &&
+      echo 'sentinel parallel-syncs mymaster 1' >> /tmp/sentinel.conf &&
+      echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
+      redis-sentinel /tmp/sentinel.conf"
+
+  sentinel-3:
+    <<: *redis-sentinel-config
+    container_name: redis-sentinel-3
+    ports:
+      - "26381:26379"
+    volumes:
+      - ./redis_sentinel/sentinels:/usr/local/etc/redis/config-dir
+    command: >
+      sh -c "echo 'Esperando a redis-master...' && sleep 10 &&
+      echo 'bind 0.0.0.0' > /tmp/sentinel.conf &&
+      echo 'protected-mode no' >> /tmp/sentinel.conf &&
+      echo 'port 26381' >> /tmp/sentinel.conf &&
+      echo 'sentinel monitor mymaster redis-master 6379 2' >> /tmp/sentinel.conf &&
+      echo 'sentinel down-after-milliseconds mymaster 5000' >> /tmp/sentinel.conf &&
+      echo 'sentinel failover-timeout mymaster 10000' >> /tmp/sentinel.conf &&
+      echo 'sentinel parallel-syncs mymaster 1' >> /tmp/sentinel.conf &&
+      echo 'sentinel resolve-hostnames yes' >> /tmp/sentinel.conf &&
+      redis-sentinel /tmp/sentinel.conf"
+
+volumes:
+  grafana_data:
+
+networks:
+  webnet:

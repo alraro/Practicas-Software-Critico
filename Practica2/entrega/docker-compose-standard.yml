@@ -1,0 +1,53 @@
+services:
+  web:
+    image: alraro/practica2-software-critico:latest
+    deploy:
+      replicas: 5
+      restart_policy:
+        condition: on-failure
+    ports:
+      - "4000:5000"
+    environment:
+      - REDIS_HOST=redis
+      - PORT=5000
+    networks:
+      - webnet
+  visualizer:
+    image: dockersamples/visualizer:stable
+    ports:
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    networks:
+      - webnet
+  redis:
+    image: redis/redis-stack-server:latest
+    ports:
+      - "6379:6379"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    networks:
+      - webnet
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - redis
+    networks:
+      - webnet
+    environment:
+      - GF_INSTALL_PLUGINS=redis-datasource
+
+volumes:
+  grafana_data:
+
+networks:
+  webnet:
