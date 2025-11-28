@@ -69,6 +69,8 @@ def main():
             print(f"❌ Error: No se pudo conectar a {API_URL}. ¿Está levantado el Docker?")
         except Exception as e:
             print(f"❌ Error inesperado: {e}")
+    
+        time.sleep(1)
 
         # Esperar 1 segundo
 
