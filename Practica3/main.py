@@ -1,5 +1,8 @@
 from kazoo.client import KazooClient
 from kazoo.recipe.election import Election
+from kazoo.recipe.barrier import Barrier
+from kazoo.recipe.counter import Counter
+
 import os
 import sys
 import random
@@ -9,7 +12,9 @@ import requests
 
 ZOOKEEPER_HOSTS = os.getenv("ZOOKEEPER_HOSTS", "").strip()
 MEDICIONES_PATH = "mediciones"
-ELECTION_PATH = "election_path"
+ELECTION_PATH = "election"
+BARRIER_PATH = "barrier"
+COUNTER_PATH = "counter"
 CONFIG_PATH = os.getenv("CONFIG_PATH", "config")
 UPDATE_COUNTER = 0
 
@@ -43,13 +48,20 @@ def get_values_from_children(zk, node_id):
 
 def trabajo_lider(zk, node_id):
     print(f"[INFO] Node {node_id} is now the leader.")
+    barrier = Barrier(zk, f"/{BARRIER_PATH}")
+    counter = Counter(zk, f"/{COUNTER_PATH}")
     
     @zk.ChildrenWatch(f"/{MEDICIONES_PATH}")
     def watch_mediciones(children):
         print(f"[INFO] [LEADER NODE {node_id}] Measurements updated. Current nodes: {children}")
-    
-    try:
-        while True:
+        
+    while True:
+        try:
+            barrier.create()
+            print(f"[INFO] [LEADER NODE {node_id}] Waiting at barrier for {SAMPLING_PERIOD} seconds.")
+            sleep(SAMPLING_PERIOD)
+
+            total_mediciones = counter.value
             if zk.exists(f"/{MEDICIONES_PATH}"):
                 values = get_values_from_children(zk, node_id)
                 if values:
@@ -60,11 +72,21 @@ def trabajo_lider(zk, node_id):
                     print(f"[ERROR] [LEADER NODE {node_id}] No valid measurements to calculate average.")
             else:
                 print(f"[ERROR] [LEADER NODE {node_id}] No measurements found in /{MEDICIONES_PATH}.")
-            sleep(SAMPLING_PERIOD)
-    except Exception as e:
-        print(f"[ERROR] [LEADER NODE {node_id}] encountered an error: {e}")
+        except Exception as e:
+            print(f"[ERROR] [LEADER NODE {node_id}] encountered an error: {e}")
+        finally:
+            print(f"[INFO] [LEADER NODE {node_id}] Releasing barrier.")
+            barrier.remove()
+            sleep(1)
                     
 def publicar_medicion_ephemeral(zk, node_id):
+    
+    zk.ensure_path(f"/{BARRIER_PATH}")
+    barrier = Barrier(zk, f"/{BARRIER_PATH}")
+    zk.ensure_path(f"/{COUNTER_PATH}")
+    counter = Counter(zk, f"/{COUNTER_PATH}")
+    
+    
     while True:
         try:
             measure = random.normalvariate(70, 5)
@@ -75,10 +97,16 @@ def publicar_medicion_ephemeral(zk, node_id):
             else:
                 print(f"[NODE {node_id}] - Creating ephemeral measurement node.")
                 zk.create(f"/{MEDICIONES_PATH}/{node_id}", str(measure).encode("utf-8"), ephemeral=True, makepath=True)
+
+            print(f"[NODE {node_id}] - Waiting at barrier.")
+            barrier.wait()
+            print(f"[NODE {node_id}] - Passed barrier.")
+
+            counter.increment()
+            print(f"[NODE {node_id}] - Incremented counter to {counter.value}.")
+            sleep(2)
         except Exception as e:
             print(f"[ERROR] [NODE {node_id}] encountered an error: {e}")
-        finally:
-            sleep(SAMPLING_PERIOD)
 
 def setup_watchers(zk):
     zk.ensure_path(f"/{CONFIG_PATH}/sampling_period")
