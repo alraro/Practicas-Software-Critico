@@ -1,4 +1,5 @@
-import kazoo
+from kazoo.client import KazooClient
+from kazoo.recipe.election import Election
 import os
 import sys
 import random
@@ -9,7 +10,7 @@ import requests
 ZOOKEEPER_HOSTS = os.getenv("ZOOKEEPER_HOSTS", "").strip()
 MEDICIONES_PATH = "mediciones"
 ELECTION_PATH = "election_path"
-URL="http://localhost:4000/detectar"
+URL="http://host.docker.internal:4000/detectar"
 
 def send_metric(URL, value):
     try:
@@ -69,7 +70,7 @@ def main():
         print("No Zookeeper hosts provided.")
         return
     else:
-        zk = kazoo.client.KazooClient(hosts=ZOOKEEPER_HOSTS)
+        zk = KazooClient(hosts=ZOOKEEPER_HOSTS)
         zk.start()
         print(f"Connected to Zookeeper at {ZOOKEEPER_HOSTS}")
 
@@ -84,7 +85,7 @@ def main():
     medidor = threading.Thread(target=publicar_medicion_ephemeral, args=(zk, node_id), daemon=True)
     medidor.start()
     
-    elector = zk.Election(f"/{ELECTION_PATH}", identifier=str(node_id))
+    elector = Election(zk, f"/{ELECTION_PATH}", identifier=str(node_id))
     elector.run(lambda: trabajo_lider(zk, node_id))
     
 if __name__ == "__main__":

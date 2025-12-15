@@ -9,4 +9,6 @@ COPY main.py /app
 RUN useradd -m alraro
 USER alraro
 
+ENV PYTHONUNBUFFERED=1
+
 ENTRYPOINT ["python", "main.py"]

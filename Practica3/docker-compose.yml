@@ -80,6 +80,8 @@ services:
       ZOOKEEPER_HOSTS: zookeeper1:2181,zookeeper2:2181,zookeeper3:2181
     networks:
       - zk-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   practica3-2:
     image: alraro/practica3:latest
@@ -96,6 +98,8 @@ services:
       ZOOKEEPER_HOSTS: zookeeper1:2181,zookeeper2:2181,zookeeper3:2181
     networks:
       - zk-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   practica3-3:
     image: alraro/practica3:latest
@@ -112,6 +116,8 @@ services:
       ZOOKEEPER_HOSTS: zookeeper1:2181,zookeeper2:2181,zookeeper3:2181
     networks:
       - zk-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
   zk-network:
