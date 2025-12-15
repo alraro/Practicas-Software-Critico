@@ -10,7 +10,7 @@ import requests
 ZOOKEEPER_HOSTS = os.getenv("ZOOKEEPER_HOSTS", "").strip()
 MEDICIONES_PATH = "mediciones"
 ELECTION_PATH = "election_path"
-URL="http://host.docker.internal:4000/nuevo"
+URL=os.getenv("METRICS_URL", "http://host.docker.internal:4000/nuevo")
 
 def send_metric(URL, value):
     try:
