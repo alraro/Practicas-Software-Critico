@@ -5,6 +5,7 @@ COPY requirements.txt /app
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY main.py /app
+COPY init_config.py /app
 
 RUN useradd -m alraro
 USER alraro
