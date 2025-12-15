@@ -10,7 +10,7 @@ import requests
 ZOOKEEPER_HOSTS = os.getenv("ZOOKEEPER_HOSTS", "").strip()
 MEDICIONES_PATH = "mediciones"
 ELECTION_PATH = "election_path"
-URL="http://host.docker.internal:4000/detectar"
+URL="http://host.docker.internal:4000/nuevo"
 
 def send_metric(URL, value):
     try:
@@ -57,9 +57,11 @@ def publicar_medicion_ephemeral(zk, node_id):
             measure = random.normalvariate(70, 5)
             print(f"Node {node_id} - Measure: {measure}")
             if zk.exists(f"/{MEDICIONES_PATH}/{node_id}"):
+                print(f"Node {node_id} - Updating measurement.")
                 zk.set(f"/{MEDICIONES_PATH}/{node_id}", str(measure).encode("utf-8"))
             else:
-                zk.create(f"/{MEDICIONES_PATH}/{node_id}", str(measure).encode("utf-8"), ephemeral=True)
+                print(f"Node {node_id} - Creating ephemeral measurement node.")
+                zk.create(f"/{MEDICIONES_PATH}/{node_id}", str(measure).encode("utf-8"), ephemeral=True, makepath=True)
         except Exception as e:
             print(f"Error in node {node_id}: {e}")
         finally:
