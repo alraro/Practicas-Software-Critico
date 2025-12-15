@@ -102,7 +102,7 @@ def publicar_medicion_ephemeral(zk, node_id):
             barrier.wait()
             print(f"[NODE {node_id}] - Passed barrier.")
 
-            counter.increment()
+            counter += 1
             print(f"[NODE {node_id}] - Incremented counter to {counter.value}.")
             sleep(2)
         except Exception as e:
