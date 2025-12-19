@@ -10,6 +10,8 @@ from time import sleep
 import threading
 import requests
 
+# Configuración inicial
+
 ZOOKEEPER_HOSTS = os.getenv("ZOOKEEPER_HOSTS", "").strip()
 MEDICIONES_PATH = "mediciones"
 ELECTION_PATH = "election"
@@ -21,6 +23,7 @@ UPDATE_COUNTER = 0
 SAMPLING_PERIOD = 5.0
 URL=os.getenv("METRICS_URL", "http://host.docker.internal:4000/nuevo")
 
+# Función para enviar métricas a la URL especificada
 def send_metric(URL, value):
     try:
         response = requests.get(URL + "?dato=" + str(value))
@@ -28,9 +31,11 @@ def send_metric(URL, value):
     except Exception as e:
         print(f"[ERROR] Error sending value {value} to {URL}: {e}")
 
+# Función para obtener valores de los nodos hijos
 def get_values_from_children(zk, node_id):
     values = []
     try:
+        # Obtener los nodos hijos bajo /mediciones
         children = zk.get_children(f"/{MEDICIONES_PATH}")
         print(f"[LEADER NODE {node_id}] - Current Measurements:")
         for child in children:
@@ -46,20 +51,24 @@ def get_values_from_children(zk, node_id):
         return []
     return values
 
+# Función principal del líder
 def trabajo_lider(zk, node_id):
     print(f"[INFO] Node {node_id} is now the leader.")
     barrier = Barrier(zk, f"/{BARRIER_PATH}")
     
+    # Watcher para cambios en los nodos de mediciones
     @zk.ChildrenWatch(f"/{MEDICIONES_PATH}")
     def watch_mediciones(children):
         print(f"[INFO] [LEADER NODE {node_id}] Measurements updated. Current nodes: {children}")
         
     while True:
         try:
+            # Crear la barrera
             barrier.create()
             print(f"[INFO] [LEADER NODE {node_id}] Waiting at barrier for {SAMPLING_PERIOD} seconds.")
             sleep(SAMPLING_PERIOD)
 
+            # Calcular el promedio de las mediciones
             if zk.exists(f"/{MEDICIONES_PATH}"):
                 values = get_values_from_children(zk, node_id)
                 if values:
@@ -73,9 +82,11 @@ def trabajo_lider(zk, node_id):
         except Exception as e:
             print(f"[ERROR] [LEADER NODE {node_id}] encountered an error: {e}")
         finally:
+            # Liberar la barrera
             print(f"[INFO] [LEADER NODE {node_id}] Releasing barrier.")
             barrier.remove()
-                    
+       
+# Función para publicar mediciones como nodos efímeros             
 def publicar_medicion_ephemeral(zk, node_id):
     
     barrier = Barrier(zk, f"/{BARRIER_PATH}")
@@ -84,6 +95,7 @@ def publicar_medicion_ephemeral(zk, node_id):
     
     while True:
         try:
+            # Simular medición
             measure = random.normalvariate(70, 5)
             print(f"[NODE {node_id}] - Measure: {measure}")
             if zk.exists(f"/{MEDICIONES_PATH}/{node_id}"):
@@ -92,27 +104,35 @@ def publicar_medicion_ephemeral(zk, node_id):
                 print(f"[NODE {node_id}] - Creating ephemeral measurement node.")
                 zk.create(f"/{MEDICIONES_PATH}/{node_id}", str(measure).encode("utf-8"), ephemeral=True, makepath=True)
 
+            # Esperar en la barrera
             while not zk.exists(f"/{BARRIER_PATH}"):
                 print(f"[NODE {node_id}] - Waiting for barrier to be created.")
                 sleep(0.1)
             
             print(f"[NODE {node_id}] - Waiting at barrier.")
             cleared = barrier.wait(timeout=SAMPLING_PERIOD + 5)
+            
+            # Verificar si se pasó la barrera
             if not cleared:
                 print(f"[ERROR] [NODE {node_id}] - Timeout waiting at barrier.")
                 continue
+            
+            # Incrementar el contador
             counter += 1
             print(f"[NODE {node_id}] - Passed barrier.")
 
+            # Actualizar y mostrar el valor del contador
             print(f"[NODE {node_id}] - Incremented counter to {counter.value}.")
             sleep(0.5)
         except Exception as e:
             print(f"[ERROR] [NODE {node_id}] encountered an error: {e}")
 
+# Configurar watchers para configuraciones dinámicas
 def setup_watchers(zk):
     zk.ensure_path(f"/{CONFIG_PATH}/sampling_period")
     zk.ensure_path(f"/{CONFIG_PATH}/api_url")
     
+    # Watcher para SAMPLING_PERIOD
     @zk.DataWatch(f"/{CONFIG_PATH}/sampling_period")
     def watch_sampling_period(data, stat):
         global SAMPLING_PERIOD
@@ -123,6 +143,7 @@ def setup_watchers(zk):
             except ValueError:
                 print(f"[ERROR] [CONFIG] Invalid SAMPLING_PERIOD value received: {data.decode('utf-8')}")
     
+    # Watcher para URL
     @zk.DataWatch(f"/{CONFIG_PATH}/api_url")
     def watch_api_url(data, stat):
         global URL
@@ -130,7 +151,9 @@ def setup_watchers(zk):
             URL = data.decode("utf-8")
             print(f"[CONFIG] Updated API URL to {URL}")
 
+# Ejecucion principal
 def main():
+    # Configurar Zookeeper
     try:
         global SAMPLING_PERIOD
         SAMPLING_PERIOD = float(os.getenv("SAMPLING_PERIOD", "5"))
@@ -143,21 +166,24 @@ def main():
     else:
         zk = KazooClient(hosts=ZOOKEEPER_HOSTS)
         zk.start()
-        print(f"[ERROR] Connected to Zookeeper at {ZOOKEEPER_HOSTS}")
+        print(f"[INFO] Connected to Zookeeper at {ZOOKEEPER_HOSTS}")
 
+    # Verificar argumentos
     argc = len(sys.argv)
     if argc != 2:
         print("[ERROR] Usage: python main.py <node_id>")
         return
     
-    
+    # Configurar watchers para configuraciones dinámicas
     setup_watchers(zk)
     node_id = int(sys.argv[1])
     print(f"[INFO] Running node with ID: {node_id}")
     
+    # Hilo para publicar mediciones
     medidor = threading.Thread(target=publicar_medicion_ephemeral, args=(zk, node_id), daemon=True)
     medidor.start()
     
+    # Elección de líder
     elector = Election(zk, f"/{ELECTION_PATH}", identifier=str(node_id))
     elector.run(lambda: trabajo_lider(zk, node_id))
     
