@@ -49,7 +49,6 @@ def get_values_from_children(zk, node_id):
 def trabajo_lider(zk, node_id):
     print(f"[INFO] Node {node_id} is now the leader.")
     barrier = Barrier(zk, f"/{BARRIER_PATH}")
-    counter = Counter(zk, f"/{COUNTER_PATH}")
     
     @zk.ChildrenWatch(f"/{MEDICIONES_PATH}")
     def watch_mediciones(children):
@@ -61,7 +60,6 @@ def trabajo_lider(zk, node_id):
             print(f"[INFO] [LEADER NODE {node_id}] Waiting at barrier for {SAMPLING_PERIOD} seconds.")
             sleep(SAMPLING_PERIOD)
 
-            total_mediciones = counter.value
             if zk.exists(f"/{MEDICIONES_PATH}"):
                 values = get_values_from_children(zk, node_id)
                 if values:
@@ -77,34 +75,37 @@ def trabajo_lider(zk, node_id):
         finally:
             print(f"[INFO] [LEADER NODE {node_id}] Releasing barrier.")
             barrier.remove()
-            sleep(1)
                     
 def publicar_medicion_ephemeral(zk, node_id):
     
-    zk.ensure_path(f"/{BARRIER_PATH}")
     barrier = Barrier(zk, f"/{BARRIER_PATH}")
     zk.ensure_path(f"/{COUNTER_PATH}")
     counter = Counter(zk, f"/{COUNTER_PATH}")
-    
     
     while True:
         try:
             measure = random.normalvariate(70, 5)
             print(f"[NODE {node_id}] - Measure: {measure}")
             if zk.exists(f"/{MEDICIONES_PATH}/{node_id}"):
-                print(f"[NODE {node_id}] - Updating measurement.")
                 zk.set(f"/{MEDICIONES_PATH}/{node_id}", str(measure).encode("utf-8"))
             else:
                 print(f"[NODE {node_id}] - Creating ephemeral measurement node.")
                 zk.create(f"/{MEDICIONES_PATH}/{node_id}", str(measure).encode("utf-8"), ephemeral=True, makepath=True)
 
+            while not zk.exists(f"/{BARRIER_PATH}"):
+                print(f"[NODE {node_id}] - Waiting for barrier to be created.")
+                sleep(0.1)
+            
             print(f"[NODE {node_id}] - Waiting at barrier.")
-            barrier.wait()
+            cleared = barrier.wait(timeout=SAMPLING_PERIOD + 5)
+            if not cleared:
+                print(f"[ERROR] [NODE {node_id}] - Timeout waiting at barrier.")
+                continue
+            counter += 1
             print(f"[NODE {node_id}] - Passed barrier.")
 
-            counter += 1
             print(f"[NODE {node_id}] - Incremented counter to {counter.value}.")
-            sleep(2)
+            sleep(0.5)
         except Exception as e:
             print(f"[ERROR] [NODE {node_id}] encountered an error: {e}")
 
